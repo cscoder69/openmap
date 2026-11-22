@@ -6,13 +6,17 @@
 
 - **Place names whole in other languages** (#377): where two zones meet, a name longer than the English one
   went under the zone next to it ("Acampamento Taurajo" lost its first letters under Mulgore, and "Fortaleza
-  da Guardanorte" and "Platô do Vigia dos Céus" didn't show at all, on the Brazilian Portuguese client). Each
-  zone's names now stay over its neighbours, in the 20 zones where that happened. Done for Brazilian
+  da Guardanorte" and "Platô do Vigia dos Céus" didn't show at all, on the Brazilian Portuguese client), and
+  one at a zone's edge faded with it ("Charco de Lodo" at the Barrens' top). Each zone's names now stay whole
+  over its neighbours, in the 20 zones where that happened. Done for Brazilian
   Portuguese so far (it needs that language's art). By cscoder69.
 - **A capital's name banner whole over its map in other languages**: on a client not in English, the city's
   own map, coming in as you zoom, covered the zone's banner for it (Thunder Bluff showed only the last
   letter of "Penhasco do Trovão"). The banner is now drawn over the city in your language, and goes as you
   close in, as it does in English. By cscoder69.
+- **Orgrimmar's map fades out at its gate**: up close, the city's map ended in a straight line across the
+  foot of its gate, where its art stops. It now fades out inside the art's edge, as Ironforge's does. By
+  cscoder69.
 
 ## v0.8.13 (2026-11-22)
 
