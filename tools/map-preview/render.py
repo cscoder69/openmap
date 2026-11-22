@@ -216,7 +216,7 @@ def banner(city):
             img = Image.open(os.path.join(TEXDIR, "MapBanner", "%d.tga" % city)).convert("RGBA").resize((1002, 668), Image.LANCZOS)
             img = np.asarray(img).astype(np.float32) / 255
             if not ENGLISH:                           # (another language: its zone's own art through the cut's shape, Stitch.lua's)
-                own = over(zone)[y:y + h, x:x + w]
+                own = overlay_canvas(zone["art"])[y:y + h, x:x + w]   # (without its hole: it's the banner)
                 own = np.asarray(Image.fromarray((np.clip(own, 0, 1) * 255).astype(np.uint8), "RGBA").resize((1002, 668), Image.LANCZOS)).astype(np.float32) / 255
                 own[..., 3] *= img[..., 3]
                 img = own
@@ -271,9 +271,9 @@ def over(m):
     k = ("o", m["id"])
     if k not in _cache:
         o = overlay_canvas(m["art"])
-        # (drawn without its banner for a city: banners.py; English only, as Stitch.lua's BannerHole:
-        # another language's art keeps its own banner, in its language)
-        hole = mask("MapBannerHole/%d" % m["id"]) if ENGLISH else None
+        # (drawn without its banner for a city: banners.py, as Stitch.lua's BannerHole; another language's
+        # banner is cut from this art too, banner())
+        hole = mask("MapBannerHole/%d" % m["id"])
         if hole is not None:
             o = o.copy()
             o[..., 3] *= hole
@@ -736,7 +736,7 @@ def render(cu, cv, zoom, path):
             if has_over[m["id"]]: place(m, over_shown, over_edge(m) * core(m), alpha=d)
         for m in zones:                                   # another language's names a neighbour would cover, over them (letters.py)
             lm = None if ENGLISH else mask("MapLetters/%s/%d" % (LOCALE, m["id"]))
-            if has_over[m["id"]] and lm is not None: place(m, over_shown, over_edge(m) * lm, alpha=d)
+            if has_over[m["id"]] and lm is not None: place(m, over_shown, lm, alpha=d)   # (whole: not faded at its frame)
     if UNEXPLORED_SIM and not UNEXPLORED_HIDE and not ZONES_ONLY:   # a zone you've been to: each piece's art again, the unexplored
         for m in zones:                                   # darkened, the explored over them (Stitch.lua's Shade.Pieces)
             if UNEXPLORED_SIM.get(m["name"]) != "half" or not has_over[m["id"]]: continue
@@ -1607,7 +1607,7 @@ def bake_zones():
     for m in ([] if ENGLISH else live):                  # (another language's names a neighbour would cover: letters.py)
         lm = mask("MapLetters/%s/%d" % (LOCALE, m["id"]))
         if lm is not None:
-            layers.append((m["rect"], lambda m=m: over(m), lambda m=m, lm=lm: edge_of(m) * lm, None, BAKE_DESAT))
+            layers.append((m["rect"], lambda m=m: over(m), lambda lm=lm: lm, None, BAKE_DESAT))
     out_dir = ZONES_DIR
     os.makedirs(out_dir, exist_ok=True)
     for f in os.listdir(out_dir):
@@ -1704,7 +1704,7 @@ def bake_fog():
         land = mask("MapZoneLand/%d" % m["id"])
         if land is None: continue
         edge_ = over_edge(m) if grade.get(m["id"]) else M_THIN
-        hole = mask("MapBannerHole/%d" % m["id"]) if ENGLISH else None
+        hole = mask("MapBannerHole/%d" % m["id"])
         C = (1 - np.prod(1 - A, 0)) * land * edge_ * (hole if hole is not None else 1)
         S_ = A.sum(0)
         entries = []

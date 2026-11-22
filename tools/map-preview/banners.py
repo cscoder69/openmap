@@ -108,9 +108,9 @@ CITY_TITLES = {
 # the zone's base art under it isn't its overlay's colour (Mulgore's is bare parchment under its green),
 # the city's own map covers the hole the banner leaves once it's gone
 COVER_BANNER = {"Thunder Bluff"}
-# cities whose plan runs into the art's torn frame (Ironforge's wards, top and bottom): their cut fades out
-# inside it, as a kept banner's does, not at the art's rectangle
-IN_FRAME = {"Ironforge"}
+# cities whose plan runs into the art's torn frame (Ironforge's wards, top and bottom; Orgrimmar's gate, at
+# the foot of its art): their cut fades out inside it, as a kept banner's does, not at the art's rectangle
+IN_FRAME = {"Ironforge", "Orgrimmar"}
 CITY_SOFT = 50                  # art px over which a city's cut fades (out from its outline: the plan stays whole)
 TITLE_FRAME = (10, 28)          # art px from the art's edge where a kept banner's cut (IN_FRAME: a plan's) is gone / whole (its torn frame)
 

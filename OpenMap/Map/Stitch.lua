@@ -707,7 +707,8 @@ local function PlaceOverlays(mapID)
 	local coreThin = core and (ZoneMask(coreRoot, p, EDGE) or Feather(coreRoot, p, FEATHER_THIN))
 	-- (without the interiors, on its territory where it has one: its halos never over a neighbour's land)
 	local territory = not core and ZoneMask(parent, p, TERRITORY) or nil
-	-- (another language's names a neighbour's own land would cover: drawn again over every interior)
+	-- (another language's names a neighbour's own land would cover: drawn again over every interior, whole,
+	-- not faded at the zone's frame: a name beside it, "Charco de Lodo" at the Barrens' top, went with it)
 	local over = core and coreRoot or parent
 	local words, letters = S.Letters(over, p)
 	local n = 0
@@ -717,7 +718,7 @@ local function PlaceOverlays(mapID)
 			PlaceTiles(coreRoot, p, files, x, y, w, h, "ARTWORK", sub, true, coreThin, graded, piece, nil, core)
 		end
 		if letters and S.LettersIn(words, x, y, w, h) then
-			PlaceTiles(over, p, files, x, y, w, h, "OVERLAY", sub, true, core and coreThin or mask, graded, piece, nil, letters)
+			PlaceTiles(over, p, files, x, y, w, h, "OVERLAY", sub, true, nil, graded, piece, nil, letters)
 		end
 	end)
 	overlayZones[#overlayZones + 1] = mapID
@@ -2207,7 +2208,7 @@ local function BuildBlur(mapID)
 		ForEachPiece(mapID, function(files, x, y, w, h, sub, piece)
 			PlaceTiles(f, p, files, x, y, w, h, "ARTWORK", sub, true, thin, graded, piece, nil, core)
 			if letters and S.LettersIn(words, x, y, w, h) then
-				PlaceTiles(f, p, files, x, y, w, h, "OVERLAY", sub, true, thin, graded, piece, nil, letters)
+				PlaceTiles(f, p, files, x, y, w, h, "OVERLAY", sub, true, nil, graded, piece, nil, letters)
 			end
 		end)
 		frames[i] = f
