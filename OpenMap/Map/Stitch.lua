@@ -421,11 +421,11 @@ end
 -- `band`: also draw a colour-matched copy through this mask.
 -- a zone's overlay art is drawn without its banner for a city (ns.MapBannerHoles): Stitch's
 -- copy of the banner shows instead, and goes once you're close (S.SetZoom). The copies are cut from the
--- English client's art, lettered in English: another language keeps the zone's own banner, in its
--- language (Thunder Bluff's on esMX, Darnassus' on zhCN: #47)
+-- English client's art, lettered in English: another language's copy is cut from its own zone art, in its
+-- language (Thunder Bluff's on esMX, Darnassus' on zhCN: #47), with the same hole under it
 local holeMasks = {}
 local function BannerHole(parent, p)
-	if not Baked.english then return end
+	if parent.omBanner then return end
 	if not (p.mapID and ns.MapBannerHoles and ns.MapBannerHoles[p.mapID]) then return end
 	local key = tostring(parent) .. p.mapID
 	holeMasks[key] = holeMasks[key] or Feather(parent, p, TEX .. "MapBannerHole\\" .. p.mapID)
@@ -498,6 +498,25 @@ end
 local function ZoneMask(parent, p, folder)
 	if ns.MapGrade and ns.MapGrade[p.mapID] then return Feather(parent, p, folder .. p.mapID) end
 	if folder == TERRITORY and ns.MapTerritories and ns.MapTerritories[p.mapID] then return Feather(parent, p, folder .. p.mapID) end
+end
+
+-- a zone's names in another language that a neighbour's own land would cover (ns.MapLetters,
+-- tools/map-preview/letters.py: the masks were made round the English names, and longer ones went under
+-- the zone drawn next to it, "Acampamento Taurajo" under Mulgore): their boxes in its art px, and a mask of
+-- them on `parent`; nil where it has none
+function S.Letters(parent, p)
+	local words = ns.MapLetters and ns.MapLetters[GetLocale()]
+	words = words and words[p.mapID]
+	if not words then return end
+	return words, Feather(parent, p, TEX .. "MapLetters\\" .. GetLocale() .. "\\" .. p.mapID)
+end
+
+-- whether a piece (its art px) takes in any of those words
+function S.LettersIn(words, x, y, w, h)
+	for _, b in ipairs(words) do
+		if x < b[3] and x + w > b[1] and y < b[4] and y + h > b[2] then return true end
+	end
+	return false
 end
 
 -- A map's own base art (its whole layer), edges faded by `feather` when given;
@@ -688,11 +707,17 @@ local function PlaceOverlays(mapID)
 	local coreThin = core and (ZoneMask(coreRoot, p, EDGE) or Feather(coreRoot, p, FEATHER_THIN))
 	-- (without the interiors, on its territory where it has one: its halos never over a neighbour's land)
 	local territory = not core and ZoneMask(parent, p, TERRITORY) or nil
+	-- (another language's names a neighbour's own land would cover: drawn again over every interior)
+	local over = core and coreRoot or parent
+	local words, letters = S.Letters(over, p)
 	local n = 0
 	ForEachPiece(mapID, function(files, x, y, w, h, sub, piece)
 		n = n + PlaceTiles(parent, p, files, x, y, w, h, "ARTWORK", sub, true, mask, graded, piece, band, territory)
 		if core then
 			PlaceTiles(coreRoot, p, files, x, y, w, h, "ARTWORK", sub, true, coreThin, graded, piece, nil, core)
+		end
+		if letters and S.LettersIn(words, x, y, w, h) then
+			PlaceTiles(over, p, files, x, y, w, h, "OVERLAY", sub, true, core and coreThin or mask, graded, piece, nil, letters)
 		end
 	end)
 	overlayZones[#overlayZones + 1] = mapID
@@ -1608,18 +1633,37 @@ function S.BuildNow(parent, artLevel, range, iconLevel)
 	-- a zone's name banner for a city (ns.MapBanners, tools/map-preview/banners.py), cut from
 	-- the zone's art: the city's title at every zoom (its own map is cut down to its plan, without
 	-- its banner), over the city and the close-up layers (the minimap, the caves), with the labels
+	-- Another language: the banner is the zone's own art there (in the client's language), through the
+	-- English cut's shape (the same scroll, in the same place), so it isn't hidden under the city's map
+	-- as that comes in (Thunder Bluff's on ptBR showed only its last letter)
 	for _, c in ipairs(cities) do
-		local b = Baked.english and ns.MapBanners and ns.MapBanners[c.mapID]
+		local b = ns.MapBanners and ns.MapBanners[c.mapID]
 		local p = b and Place(b[1])
 		if p then
 			local f = CreateFrame("Frame", nil, citiesRoot)
 			f:SetAllPoints(root)
 			f:SetFrameLevel(artLevel + range - 3)
-			local tex = f:CreateTexture(nil, "ARTWORK")
-			tex:SetTexture(TEX .. "MapBanner\\" .. c.mapID, nil, nil, "LINEAR")
-			Record(tex, p.left + b[2] * p.sx, p.top + b[3] * p.sy, b[4] * p.sx, b[5] * p.sy)
+			f.omBanner = true                       -- (BannerHole: never on the banner itself)
+			local bx, by, bw, bh = b[2], b[3], b[4], b[5]
+			if Baked.english then
+				local tex = f:CreateTexture(nil, "ARTWORK")
+				tex:SetTexture(TEX .. "MapBanner\\" .. c.mapID, nil, nil, "LINEAR")
+				Record(tex, p.left + bx * p.sx, p.top + by * p.sy, bw * p.sx, bh * p.sy)
+				c.bannerTexs = { tex }
+			elseif ns.MapBannerHoles and ns.MapBannerHoles[b[1]] then
+				local shape = f:CreateMaskTexture()
+				shape:SetTexture(TEX .. "MapBanner\\" .. c.mapID, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+				Record(shape, p.left + bx * p.sx, p.top + by * p.sy, bw * p.sx, bh * p.sy)
+				local texs = {}
+				ForEachPiece(b[1], function(files, x, y, w, h, sub, piece)
+					if x < bx + bw and x + w > bx and y < by + bh and y + h > by then
+						PlaceTiles(f, p, files, x, y, w, h, "ARTWORK", sub, true, shape, texs)
+					end
+				end)
+				if #texs > 0 then c.bannerTexs = texs end
+			end
 			f:Hide()
-			c.banner, c.bannerTex = f, tex
+			if c.bannerTexs then c.banner = f end
 		end
 	end
 
@@ -2159,8 +2203,12 @@ local function BuildBlur(mapID)
 		f:SetAlpha(1 / (i + 1))
 		PlaceShift(f)
 		local thin, core = ZoneMask(f, p, EDGE) or Feather(f, p, FEATHER_THIN), ZoneMask(f, p, CORE)
+		local words, letters = S.Letters(f, p)
 		ForEachPiece(mapID, function(files, x, y, w, h, sub, piece)
 			PlaceTiles(f, p, files, x, y, w, h, "ARTWORK", sub, true, thin, graded, piece, nil, core)
+			if letters and S.LettersIn(words, x, y, w, h) then
+				PlaceTiles(f, p, files, x, y, w, h, "OVERLAY", sub, true, thin, graded, piece, nil, letters)
+			end
 		end)
 		frames[i] = f
 	end
@@ -3569,9 +3617,9 @@ cities.Dim = function()
 				e[1]:SetVertexColor(r, g, b, 1)
 				e[1]:SetDesaturation(dark and math.max(desat, D[4]) or desat)
 			end
-			if c.bannerTex then
-				c.bannerTex:SetVertexColor(dark and D[1] or 1, dark and D[2] or 1, dark and D[3] or 1, 1)
-				c.bannerTex:SetDesaturation(dark and D[4] or 0)
+			for _, tex in ipairs(c.bannerTexs or NONE) do
+				tex:SetVertexColor(dark and D[1] or 1, dark and D[2] or 1, dark and D[3] or 1, 1)
+				tex:SetDesaturation(dark and D[4] or 0)
 			end
 		end
 	end

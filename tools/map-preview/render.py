@@ -214,8 +214,14 @@ def banner(city):
             l, r, t, b = zone["rect"]
             sx, sy = (r - l) / 1002, (b - t) / 668
             img = Image.open(os.path.join(TEXDIR, "MapBanner", "%d.tga" % city)).convert("RGBA").resize((1002, 668), Image.LANCZOS)
+            img = np.asarray(img).astype(np.float32) / 255
+            if not ENGLISH:                           # (another language: its zone's own art through the cut's shape, Stitch.lua's)
+                own = over(zone)[y:y + h, x:x + w]
+                own = np.asarray(Image.fromarray((np.clip(own, 0, 1) * 255).astype(np.uint8), "RGBA").resize((1002, 668), Image.LANCZOS)).astype(np.float32) / 255
+                own[..., 3] *= img[..., 3]
+                img = own
             _cache[k] = {"id": "banner%d" % city, "rect": (l + x * sx, l + (x + w) * sx, t + y * sy, t + (y + h) * sy),
-                         "img": np.asarray(img).astype(np.float32) / 255}
+                         "img": img}
     return _cache[k]
 
 def city_title(city):
@@ -728,6 +734,9 @@ def render(cu, cv, zoom, path):
     if USE_CORE and not USE_BAKED:
         for m in zones:                                   # every zone's interior again, over its neighbours' halos
             if has_over[m["id"]]: place(m, over_shown, over_edge(m) * core(m), alpha=d)
+        for m in zones:                                   # another language's names a neighbour would cover, over them (letters.py)
+            lm = None if ENGLISH else mask("MapLetters/%s/%d" % (LOCALE, m["id"]))
+            if has_over[m["id"]] and lm is not None: place(m, over_shown, over_edge(m) * lm, alpha=d)
     if UNEXPLORED_SIM and not UNEXPLORED_HIDE and not ZONES_ONLY:   # a zone you've been to: each piece's art again, the unexplored
         for m in zones:                                   # darkened, the explored over them (Stitch.lua's Shade.Pieces)
             if UNEXPLORED_SIM.get(m["name"]) != "half" or not has_over[m["id"]]: continue
@@ -754,7 +763,7 @@ def render(cu, cv, zoom, path):
             a_ = smooth(zf, (fade[0] * f_, fade[1] * f_))
             cut_ = os.path.join(TEXDIR, "MapCityMask", "%d.tga" % m["id"])    # (cut down to the city: banners.py)
             place(m, base, mask("MapCityMask/%d" % m["id"]) if os.path.exists(cut_) else M_ROUND, alpha=a_)
-            b_ = ENGLISH and banner(m["id"])              # its zone's banner for it: its title at every zoom,
+            b_ = banner(m["id"])                          # its zone's banner for it: its title at every zoom,
             if b_:                                        # or giving way to its own (Stitch.lua's MapCityTitles)
                 out_ = smooth(zf, (BANNER_OUT[0] * f_, BANNER_OUT[1] * f_)) if city_title(m["id"]) else 0
                 place(b_, b_["img"], None, alpha=d * (1 - out_))
@@ -1595,6 +1604,10 @@ def bake_zones():
     for m in live:                                       # (coreRoot: the interiors, graded zones only)
         if grade.get(m["id"]) and os.path.exists(os.path.join(TEXDIR, "MapCore", "%d.tga" % m["id"])):
             layers.append((m["rect"], lambda m=m: over(m), lambda m=m: edge_of(m) * core(m), None, BAKE_DESAT))
+    for m in ([] if ENGLISH else live):                  # (another language's names a neighbour would cover: letters.py)
+        lm = mask("MapLetters/%s/%d" % (LOCALE, m["id"]))
+        if lm is not None:
+            layers.append((m["rect"], lambda m=m: over(m), lambda m=m, lm=lm: edge_of(m) * lm, None, BAKE_DESAT))
     out_dir = ZONES_DIR
     os.makedirs(out_dir, exist_ok=True)
     for f in os.listdir(out_dir):
