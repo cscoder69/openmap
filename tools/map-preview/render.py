@@ -287,8 +287,15 @@ TERR_OWN = False                # (gapfill.py: each zone through its own territo
 def terr(m):
     if TERR_OWN: return terr_own(m)
     k = ("terr", m["id"])
-    if k not in _cache: _cache[k] = mask("MapTerritory/%d" % m["id"])
+    if k not in _cache:   # (another language's, less its names round the zone's land, where it has one: letters.py)
+        own = None if ENGLISH else mask("MapTerritory/%s/%d" % (LOCALE, m["id"]))
+        _cache[k] = own if own is not None else mask("MapTerritory/%d" % m["id"])
     return _cache[k]
+
+def land_mask(id_):
+    """MapZoneLand: another language's, less its names round the zone's land, where it has one (letters.py)"""
+    own = None if ENGLISH else mask("MapZoneLand/%s/%d" % (LOCALE, id_))
+    return own if own is not None else mask("MapZoneLand/%d" % id_)
 
 def core(m):
     k = ("core", m["id"])
@@ -674,7 +681,7 @@ def render(cu, cv, zoom, path):
             if UNEXPLORED_SIM.get(z["name"]) != "all": continue
             l, r, t, b_ = z["rect"]
             if r < cl or l > cr or b_ < ct or t > cb: continue
-            for rect, mk in (((l, r, t, b_), mask("MapZoneLand/%d" % z["id"])),
+            for rect, mk in (((l, r, t, b_), land_mask(z["id"])),
                              ((l - BORDER_REACH / W_, r + BORDER_REACH / W_, t - BORDER_REACH / H_, b_ + BORDER_REACH / H_), mask("MapZoneBorder/%d" % z["id"]))):
                 if mk is None: continue
                 rl, rr, rt, rb = rect                     # the art over that rectangle, in its own px
@@ -744,7 +751,7 @@ def render(cu, cv, zoom, path):
             unexplored = set(keys[::2])
             hole = mask("MapBannerHole/%d" % m["id"])
             g, bd = grade.get(m["id"]), band(m)
-            land = mask("MapZoneLand/%d" % m["id"])
+            land = land_mask(m["id"])
             for dark in (True, False):
                 img = overlay_canvas(m["art"], {k for k in keys if (k in unexplored) == dark})
                 if hole is not None:
@@ -778,7 +785,7 @@ def render(cu, cv, zoom, path):
     if UNEXPLORED_SIM and not UNEXPLORED_HIDE and not ZONES_ONLY:   # unexplored land, shaded over the art (Stitch.lua's shadeRoot)
         solid = np.dstack([np.full((668, 1002, 3), UNDISCOVERED[:3], np.float32), np.ones((668, 1002), np.float32)])
         for m in zones:
-            how, land = UNEXPLORED_SIM.get(m["name"]), mask("MapZoneLand/%d" % m["id"])
+            how, land = UNEXPLORED_SIM.get(m["name"]), land_mask(m["id"])
             if not how or land is None: continue
             if how == "all":
                 place(m, solid, land, alpha=UNDISCOVERED[3])

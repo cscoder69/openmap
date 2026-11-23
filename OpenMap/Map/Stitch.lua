@@ -496,8 +496,12 @@ end
 -- the zone's generated masks (MapBand, MapTerritory, MapCore) on `parent`; only
 -- colour-matched zones have them (and a client's territories without the rest: ns.MapTerritories)
 local function ZoneMask(parent, p, folder)
-	if ns.MapGrade and ns.MapGrade[p.mapID] then return Feather(parent, p, folder .. p.mapID) end
-	if folder == TERRITORY and ns.MapTerritories and ns.MapTerritories[p.mapID] then return Feather(parent, p, folder .. p.mapID) end
+	-- (a territory or land less the names round the zone's land in the client's language, where it has one:
+	-- MapTerritory and MapZoneLand leave out the English ones, ns.MapLetterTerritories, tools/map-preview/letters.py)
+	local own = (folder == TERRITORY or folder == ZONELAND) and ns.MapLetterTerritories and ns.MapLetterTerritories[GetLocale()]
+	local path = (own and own[p.mapID] and folder .. GetLocale() .. "\\" or folder) .. p.mapID
+	if ns.MapGrade and ns.MapGrade[p.mapID] then return Feather(parent, p, path) end
+	if folder == TERRITORY and ns.MapTerritories and ns.MapTerritories[p.mapID] then return Feather(parent, p, path) end
 end
 
 -- a zone's names in another language that a neighbour's own land would cover (ns.MapLetters,
