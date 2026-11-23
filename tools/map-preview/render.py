@@ -946,6 +946,8 @@ def over_edge(m, fresh=False):
     k = ("oedge", m["id"])
     if k not in _cache:
         p_ = os.path.join(TEXDIR, "MapEdge", "%d.tga" % m["id"])
+        own_ = os.path.join(TEXDIR, "MapEdge", LOCALE, "%d.tga" % m["id"])
+        if not ENGLISH and os.path.exists(own_) and not fresh: p_ = own_   # (less that language's names: letters.py)
         if os.path.exists(p_) and not fresh:
             _cache[k] = np.asarray(Image.open(p_).convert("RGBA").getchannel("A").resize((1002, 668), Image.BILINEAR)).astype(np.float32) / 255
             return _cache[k]

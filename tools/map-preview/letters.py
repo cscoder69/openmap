@@ -69,9 +69,9 @@ def dump_base(db2, cache, out):
 
 
 def territory(en_dir, loc_dir, locale):
-    """a zone's territory and its land (MapZoneLand: the unexplored shading's) less the names round its land in
-    that language (its neighbours', the sea's)"""
-    folders = ("MapTerritory", "MapZoneLand")
+    """a zone's territory, its land (MapZoneLand: the unexplored shading's) and its overlays' mask (MapEdge) less
+    the names round its land in that language (its neighbours', the sea's)"""
+    folders = ("MapTerritory", "MapZoneLand", "MapEdge")
     for d in folders:
         outdir = os.path.join(clients.TEX, d, locale)
         os.makedirs(outdir, exist_ok=True)
@@ -112,7 +112,11 @@ def foreign(k, en_dir, loc_dir):
     # (its own places' names are on its land, under its overlays)
     words, count = ndimage.label(ndimage.binary_dilation(ink, iterations=WORD))
     shown = ink & ~own & (t > 0.1)
-    hit = [w for w in set(np.unique(words[shown])) - {0} if (shown & (words == w)).sum() >= COVER_MIN]
+    def wide(w):                                      # (a zone's name, lettered large: a map never letters its own,
+        xs = np.nonzero((words == w).any(0))[0]       #  wherever its pieces reach, "Eira dos Montes" on Alterac's)
+        return xs.max() - xs.min() >= WIDE_NAME and (ink & (words == w)).sum() >= COVER_MIN
+    hit = [w for w in set(np.unique(words[ink])) - {0}
+           if (shown & (words == w)).sum() >= COVER_MIN or wide(w)]
     return np.isin(words, hit) if hit else None
 
 
