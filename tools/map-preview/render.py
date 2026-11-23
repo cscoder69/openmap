@@ -211,9 +211,11 @@ def banner(city):
         zone = m_ and next((z for z in maps if z["id"] == int(m_.group(1))), None)
         if zone:
             x, y, w, h = (int(m_.group(i)) for i in range(2, 6))
+            own_ = banner_locale("banners", city)          # (another language's, wider: its own cut)
+            if own_: x, y, w, h = own_[1:5]
             l, r, t, b = zone["rect"]
             sx, sy = (r - l) / 1002, (b - t) / 668
-            img = Image.open(os.path.join(TEXDIR, "MapBanner", "%d.tga" % city)).convert("RGBA").resize((1002, 668), Image.LANCZOS)
+            img = Image.open(os.path.join(TEXDIR, "MapBanner", *([LOCALE] if own_ else []), "%d.tga" % city)).convert("RGBA").resize((1002, 668), Image.LANCZOS)
             img = np.asarray(img).astype(np.float32) / 255
             if not ENGLISH:                           # (another language: its zone's own art through the cut's shape, Stitch.lua's)
                 own = overlay_canvas(zone["art"])[y:y + h, x:x + w]   # (without its hole: it's the banner)
@@ -223,6 +225,20 @@ def banner(city):
             _cache[k] = {"id": "banner%d" % city, "rect": (l + x * sx, l + (x + w) * sx, t + y * sy, t + (y + h) * sy),
                          "img": img}
     return _cache[k]
+
+def banner_locale(kind, id_):
+    """another language's banner where it's wider than the English (Banners.lua's ns.MapBannerLocales,
+    Stitch.lua's S.BannerLocale): its entry of kind ("banners", "holes", "cuts") for id_, or None"""
+    if ENGLISH: return None
+    m_ = re.search(r"^ns\.MapBannerLocales\.%s = \{(.*?)^\}" % LOCALE, open(os.path.join(WM, "Banners.lua"), encoding="utf-8").read(), re.M | re.S)
+    k_ = m_ and re.search(r"%s = \{(.*?)\},?\n" % kind, m_.group(1))
+    e_ = k_ and re.search(r"\[%d\] = (true|\{ ([\d, ]+) \})" % id_, k_.group(1))
+    if not e_: return None
+    return True if e_.group(1) == "true" else [int(v) for v in e_.group(2).split(",")]
+
+def banner_hole(id_):
+    """MapBannerHole for a zone: another language's where its banner is wider (banner_locale)"""
+    return mask(("MapBannerHole/%s/%d" % (LOCALE, id_)) if banner_locale("holes", id_) else ("MapBannerHole/%d" % id_))
 
 def city_title(city):
     """whether the city's cut keeps its own name banner (Data/Banners.lua's MapCityTitles)"""
@@ -273,7 +289,7 @@ def over(m):
         o = overlay_canvas(m["art"])
         # (drawn without its banner for a city: banners.py, as Stitch.lua's BannerHole; another language's
         # banner is cut from this art too, banner())
-        hole = mask("MapBannerHole/%d" % m["id"])
+        hole = banner_hole(m["id"])
         if hole is not None:
             o = o.copy()
             o[..., 3] *= hole
@@ -387,7 +403,7 @@ def over_shown(m):
     k = ("o_shown", m["id"])
     if k not in _cache:
         o = overlay_canvas(m["art"], {key for key, _ in reveal.get(m["art"], [])} - un)
-        hole = mask("MapBannerHole/%d" % m["id"])
+        hole = banner_hole(m["id"])
         if hole is not None:
             o = o.copy()
             o[..., 3] *= hole
@@ -749,7 +765,7 @@ def render(cu, cv, zoom, path):
             if UNEXPLORED_SIM.get(m["name"]) != "half" or not has_over[m["id"]]: continue
             keys = sorted(key for key, _ in reveal.get(m["art"], []))
             unexplored = set(keys[::2])
-            hole = mask("MapBannerHole/%d" % m["id"])
+            hole = banner_hole(m["id"])
             g, bd = grade.get(m["id"]), band(m)
             land = land_mask(m["id"])
             for dark in (True, False):
@@ -768,8 +784,9 @@ def render(cu, cv, zoom, path):
             f_ = 1 / (m["rect"][1] - m["rect"][0])
             fade = CITY_FADE_OF.get(m["id"], CITY_FADE)
             a_ = smooth(zf, (fade[0] * f_, fade[1] * f_))
-            cut_ = os.path.join(TEXDIR, "MapCityMask", "%d.tga" % m["id"])    # (cut down to the city: banners.py)
-            place(m, base, mask("MapCityMask/%d" % m["id"]) if os.path.exists(cut_) else M_ROUND, alpha=a_)
+            cname_ = ("MapCityMask/%s/%d" % (LOCALE, m["id"])) if banner_locale("cuts", m["id"]) else ("MapCityMask/%d" % m["id"])
+            cut_ = os.path.join(TEXDIR, cname_ + ".tga")    # (cut down to the city: banners.py)
+            place(m, base, mask(cname_) if os.path.exists(cut_) else M_ROUND, alpha=a_)
             b_ = banner(m["id"])                          # its zone's banner for it: its title at every zoom,
             if b_:                                        # or giving way to its own (Stitch.lua's MapCityTitles)
                 out_ = smooth(zf, (BANNER_OUT[0] * f_, BANNER_OUT[1] * f_)) if city_title(m["id"]) else 0

@@ -424,11 +424,20 @@ end
 -- English client's art, lettered in English: another language's copy is cut from its own zone art, in its
 -- language (Thunder Bluff's on esMX, Darnassus' on zhCN: #47), with the same hole under it
 local holeMasks = {}
+-- another language's banner where it's wider than the English (ns.MapBannerLocales, banners.py's BANNERS_LOCALE:
+-- Mulgore's "PENHASCO DO TROVÃO" ran past the English cut and hole): its entry of `kind` ("banners", "holes",
+-- "cuts") for `id`, or nil, and the folder it's in
+function S.BannerLocale(kind, id)
+	local L = ns.MapBannerLocales and ns.MapBannerLocales[GetLocale()]
+	local e = L and L[kind] and L[kind][id]
+	return e, e and (GetLocale() .. "\\") or ""
+end
 local function BannerHole(parent, p)
 	if parent.omBanner then return end
 	if not (p.mapID and ns.MapBannerHoles and ns.MapBannerHoles[p.mapID]) then return end
 	local key = tostring(parent) .. p.mapID
-	holeMasks[key] = holeMasks[key] or Feather(parent, p, TEX .. "MapBannerHole\\" .. p.mapID)
+	local _, sub = S.BannerLocale("holes", p.mapID)
+	holeMasks[key] = holeMasks[key] or Feather(parent, p, TEX .. "MapBannerHole\\" .. sub .. p.mapID)
 	return holeMasks[key]
 end
 
@@ -1578,7 +1587,8 @@ function S.BuildNow(parent, artLevel, range, iconLevel)
 				cities[#cities + 1] = { cf, 1 / (r - l) / (ns.ClientMaps and ns.ClientMaps.zoom or 1), mapID = info.mapID, cull = cull }
 				culled[#culled + 1] = cull
 				-- (a city cut down to the city, its plan: ns.MapCityCuts, banners.py)
-				local cut = ns.MapCityCuts and ns.MapCityCuts[info.mapID] and TEX .. "MapCityMask\\" .. info.mapID
+				local _, sub = S.BannerLocale("cuts", info.mapID)    -- (one taking in another language's wider banner)
+				local cut = ns.MapCityCuts and ns.MapCityCuts[info.mapID] and TEX .. "MapCityMask\\" .. sub .. info.mapID
 				PlaceBase(cf, info.mapID, "ARTWORK", graded, cut or FEATHER_ROUND)
 			end
 			S.stats.zones = S.stats.zones + 1
@@ -1656,8 +1666,10 @@ function S.BuildNow(parent, artLevel, range, iconLevel)
 				Record(tex, p.left + bx * p.sx, p.top + by * p.sy, bw * p.sx, bh * p.sy)
 				c.bannerTexs = { tex }
 			elseif ns.MapBannerHoles and ns.MapBannerHoles[b[1]] then
+				local own, sub = S.BannerLocale("banners", c.mapID)    -- (wider than the English: its own cut)
+				if own then bx, by, bw, bh = own[2], own[3], own[4], own[5] end
 				local shape = f:CreateMaskTexture()
-				shape:SetTexture(TEX .. "MapBanner\\" .. c.mapID, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+				shape:SetTexture(TEX .. "MapBanner\\" .. sub .. c.mapID, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
 				Record(shape, p.left + bx * p.sx, p.top + by * p.sy, bw * p.sx, bh * p.sy)
 				local texs = {}
 				ForEachPiece(b[1], function(files, x, y, w, h, sub, piece)
