@@ -17,7 +17,7 @@
 - **No bits of neighbours' names in other languages**: a zone's map letters its neighbours' names round its
   land, and the map leaves those out, but only as long as the English ones. The longer names showed their
   ends ("Flo… P…" of "Floresta de Pinhaprata" by Tirisfal, "Eira dos Montes", "Floresta do Crepúsculo",
-  "Estepes Ardentes"). They're now left out whole, in 19 zones, for Brazilian Portuguese so far. By cscoder69.
+  "Estepes Ardentes"). They're now left out whole, in 33 zones, for Brazilian Portuguese so far. By cscoder69.
 - **Orgrimmar's map fades out at its gate**: up close, the city's map ended in a straight line across the
   foot of its gate, where its art stops. It now fades out inside the art's edge, as Ironforge's does. By
   cscoder69.
